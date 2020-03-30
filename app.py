@@ -6,9 +6,12 @@ import dash_html_components as html
 import plotly.graph_objects as go
 from dash.dependencies import Input, Output
 
+global_ndays_range = 20
 
 # --- Start --- Reading base data for the Sunburst
 industry_sentiment = pd.read_json('covidsm_agg_sentiment_industry.json.zip', orient='records')
+industry_sentiment['published_at_date'] = pd.to_datetime(industry_sentiment['published_at_date'], unit='ms')
+global_start_day = industry_sentiment['published_at_date'].max() - pd.DateOffset(days=global_ndays_range)
 industries_hrchy = pd.read_csv('industries-hrchy.csv')
 industries_hrchy = industries_hrchy.replace(np.nan, '', regex=True)
 # --- End --- Reading base data for the Sunburst
@@ -28,6 +31,8 @@ fig_ind = go.Figure(data=[go.Sunburst(
 # --- End --- Load base Sunburst (no data)
 
 
+slider_dates = pd.Series(industry_sentiment[industry_sentiment['published_at_date'] >= global_start_day]['published_at_date'].unique()).sort_values(ignore_index=True)
+
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -36,9 +41,13 @@ app.layout = html.Div([
     dcc.Slider(
         id='day-slider',
         min=1,
-        max=71,
+        max=global_ndays_range,
         value=1,
-        marks={i: '{}'.format(i) for i in range(71)}
+        # marks={0: {'label': '{}'.format(slider_dates.iloc[dayix].strftime('%Y-%b-%d')),
+        #        'style': {'transform': 'rotate(45deg)'}} for dayix in slider_dates.index}
+        marks={ixday: {'label': '{}'.format(slider_dates.iloc[ixday].strftime('%d-%b')),
+                       'style': {'transform': 'rotate(-45deg)', 'margin-top': 10, 'margin-left': -20}
+                      } for ixday in slider_dates.index}
     )
 ])
 
@@ -48,10 +57,11 @@ app.layout = html.Div([
     Output('sunburst-with-slider', 'figure'),
     [Input('day-slider', 'value')])
 def update_figure(selected_date):
-    # Line that filters by sentiment dataset by date
-    filtered_hrchy = industries_hrchy.copy()  # Line that filters hierarchy to only items with sentiment
-    # TODO: Fix the root item by adding data
-    sentiment_avgs = industry_sentiment.groupby(['industry_code'], as_index=False).agg({'sentiment': 'mean'})
+    end_date = global_start_day + pd.DateOffset(days=selected_date)
+    start_date = end_date + pd.DateOffset(days=-5)
+    filtered_sentiment = industry_sentiment[(industry_sentiment['published_at_date'] >= start_date) & (industry_sentiment['published_at_date'] <= end_date)]
+    # filtered_hrchy = industries_hrchy.copy()
+    sentiment_avgs = filtered_sentiment.groupby(['industry_code'], as_index=False).agg({'sentiment': 'mean'})
     ind_with_sentiment = sentiment_avgs['industry_code'].to_list()
     filtered_hrchy = industries_hrchy[industries_hrchy['ind_fcode'].isin(ind_with_sentiment)]
     filtered_hrchy = filtered_hrchy.merge(sentiment_avgs, left_on='ind_fcode', right_on='industry_code')
