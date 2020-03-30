@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import random
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -14,6 +15,10 @@ def industries_hierarchy() -> pd.DataFrame:
 
 
 industries_hrchy = industries_hierarchy()
+# Replace with real-data calculation
+industries_hrchy['value'] = [random.gauss(1, 1) for i in range(industries_hrchy.shape[0])]
+# End replacement
+industries_hrchy['value'] = industries_hrchy['value'] / (max(abs(industries_hrchy['value'].min()), industries_hrchy['value'].max()) + 0.25)
 industry_sentiment = pd.read_json('covidsm_agg_sentiment_industry.json.zip', orient='records')
 
 fig_layout = dict(margin=dict(t=0, l=0, r=0, b=0), width=800, height=850)
@@ -21,8 +26,14 @@ fig_layout = dict(margin=dict(t=0, l=0, r=0, b=0), width=800, height=850)
 fig_ind = go.Figure(data=[go.Sunburst(
         ids=industries_hrchy['ind_fcode'],
         labels=industries_hrchy['name'],
-        parents=industries_hrchy['parent']
-        # ,values=industries_hrchy['values']
+        parents=industries_hrchy['parent'],
+        # values=industries_hrchy['values']
+        marker=dict(
+            colors=industries_hrchy['value'],
+            colorscale='RdBu',
+            cmid=0
+        ),
+        hovertemplate='<b>(%{id})</b> %{label} - Sentiment: %{color:.2f}'
     )],
     layout=fig_layout
 )
@@ -52,13 +63,19 @@ def update_figure(selected_date):
     # fig_ind_layout = dict(margin=dict(t=0, l=0, r=0, b=0), width=600, height=650)
 
     return go.Figure(data=[go.Sunburst(
-                    ids=industries_hrchy['ind_fcode'],
-                    labels=industries_hrchy['name'],
-                    parents=industries_hrchy['parent']
-                    # ,values=industries_hrchy['values']
-                )],
-                layout=fig_layout
-            )
+                            ids=industries_hrchy['ind_fcode'],
+                            labels=industries_hrchy['name'],
+                            parents=industries_hrchy['parent'],
+                            # values=industries_hrchy['values']
+                            marker=dict(
+                                colors=industries_hrchy['value'],
+                                colorscale='RdBu',
+                                cmid=0
+                            ),
+                            hovertemplate='<b>(%{id})</b> %{label} - Sentiment: %{color:.2f}'
+                        )],
+                        layout=fig_layout
+                    )
 
 
 if __name__ == '__main__':
