@@ -8,21 +8,17 @@ from dash.dependencies import Input, Output
 
 
 # --- Start --- Reading base data for the Sunburst
-def get_industries_hierarchy() -> pd.DataFrame:
-    ret_ind = pd.read_csv('industries-hrchy.csv')
-    ret_ind = ret_ind.replace(np.nan, '', regex=True)
-    return ret_ind
-
-
 industry_sentiment = pd.read_json('covidsm_agg_sentiment_industry.json.zip', orient='records')
-industries_hrchy = get_industries_hierarchy()
+industries_hrchy = pd.read_csv('industries-hrchy.csv')
+industries_hrchy = industries_hrchy.replace(np.nan, '', regex=True)
 # --- End --- Reading base data for the Sunburst
+
 
 # --- Start --- Load base Sunburst (no data)
 fig_layout = dict(margin=dict(t=0, l=0, r=0, b=0), width=800, height=850)
 fig_ind = go.Figure(data=[go.Sunburst(
         ids=['total'],
-        labels=['total'],
+        labels=['All Industries'],
         parents=[''],
         marker=dict(colors=[0], colorscale='RdBu', cmid=0),
         hovertemplate='<b>(%{id})</b> %{label} <br>- Sentiment score: %{color:.2f}'
@@ -59,6 +55,9 @@ def update_figure(selected_date):
     ind_with_sentiment = sentiment_avgs['industry_code'].to_list()
     filtered_hrchy = industries_hrchy[industries_hrchy['ind_fcode'].isin(ind_with_sentiment)]
     filtered_hrchy = filtered_hrchy.merge(sentiment_avgs, left_on='ind_fcode', right_on='industry_code')
+    root_item_list = ['indroot', 'All Industries', '', 'indroot', filtered_hrchy[filtered_hrchy['parent'] == 'indroot']['sentiment'].mean()]
+    root_item_df = pd.DataFrame([root_item_list], columns=['ind_fcode', 'name', 'parent', 'industry_code', 'sentiment'])
+    filtered_hrchy = filtered_hrchy.append(root_item_df, ignore_index=True)
 
     return go.Figure(data=[go.Sunburst(
                             ids=filtered_hrchy['ind_fcode'],
