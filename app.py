@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import random
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -8,32 +7,33 @@ import plotly.graph_objects as go
 from dash.dependencies import Input, Output
 
 
-def industries_hierarchy() -> pd.DataFrame:
+def get_industries_hierarchy() -> pd.DataFrame:
     ret_ind = pd.read_csv('industries-hrchy.csv')
     ret_ind = ret_ind.replace(np.nan, '', regex=True)
     return ret_ind
 
 
-industries_hrchy = industries_hierarchy()
-# Replace with real-data calculation
-industries_hrchy['value'] = [random.gauss(1, 1) for i in range(industries_hrchy.shape[0])]
-# End replacement
-industries_hrchy['value'] = industries_hrchy['value'] / (max(abs(industries_hrchy['value'].min()), industries_hrchy['value'].max()) + 0.25)
 industry_sentiment = pd.read_json('covidsm_agg_sentiment_industry.json.zip', orient='records')
+industries_hrchy = get_industries_hierarchy()
+
+sentiment_avgs = industry_sentiment.groupby(['industry_code'], as_index=False).agg({'sentiment': 'mean'})
+ind_with_sentiment = sentiment_avgs['industry_code'].to_list()
+filtered_hrchy = industries_hrchy[industries_hrchy['ind_fcode'].isin(ind_with_sentiment)].copy()
+filtered_hrchy = filtered_hrchy.merge(sentiment_avgs, left_on='ind_fcode', right_on='industry_code')
 
 fig_layout = dict(margin=dict(t=0, l=0, r=0, b=0), width=800, height=850)
 
 fig_ind = go.Figure(data=[go.Sunburst(
-        ids=industries_hrchy['ind_fcode'],
-        labels=industries_hrchy['name'],
-        parents=industries_hrchy['parent'],
+        ids=filtered_hrchy['ind_fcode'],
+        labels=filtered_hrchy['name'],
+        parents=filtered_hrchy['parent'],
         # values=industries_hrchy['values']
         marker=dict(
-            colors=industries_hrchy['value'],
+            colors=filtered_hrchy['sentiment'],
             colorscale='RdBu',
             cmid=0
         ),
-        hovertemplate='<b>(%{id})</b> %{label} - Sentiment: %{color:.2f}'
+        hovertemplate='<b>(%{id})</b> %{label} <br>- Sentiment score: %{color:.2f}'
     )],
     layout=fig_layout
 )
@@ -58,21 +58,24 @@ app.layout = html.Div([
     Output('sunburst-with-slider', 'figure'),
     [Input('day-slider', 'value')])
 def update_figure(selected_date):
-    # filtered_df = industry_sentiment[industry_sentiment['published_at_date'] == selected_date]
-
-    # fig_ind_layout = dict(margin=dict(t=0, l=0, r=0, b=0), width=600, height=650)
+    # Line that filters by sentiment dataset by date
+    filtered_hrchy = industries_hrchy.copy()  # Line that filters hierarchy to only items with sentiment
+    sentiment_avgs = industry_sentiment.groupby(['industry_code'], as_index=False).agg({'sentiment': 'mean'})
+    ind_with_sentiment = sentiment_avgs['industry_code'].to_list()
+    filtered_hrchy = industries_hrchy[industries_hrchy['ind_fcode'].isin(ind_with_sentiment)]
+    filtered_hrchy = filtered_hrchy.merge(sentiment_avgs, left_on='ind_fcode', right_on='industry_code')
 
     return go.Figure(data=[go.Sunburst(
-                            ids=industries_hrchy['ind_fcode'],
-                            labels=industries_hrchy['name'],
-                            parents=industries_hrchy['parent'],
+                            ids=filtered_hrchy['ind_fcode'],
+                            labels=filtered_hrchy['name'],
+                            parents=filtered_hrchy['parent'],
                             # values=industries_hrchy['values']
                             marker=dict(
-                                colors=industries_hrchy['value'],
+                                colors=filtered_hrchy['sentiment'],
                                 colorscale='RdBu',
                                 cmid=0
                             ),
-                            hovertemplate='<b>(%{id})</b> %{label} - Sentiment: %{color:.2f}'
+                            hovertemplate='<b>(%{id})</b> %{label} <br>- Sentiment score: %{color:.2f}'
                         )],
                         layout=fig_layout
                     )
