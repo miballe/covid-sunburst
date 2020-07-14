@@ -9,7 +9,7 @@ from dash.dependencies import Input, Output
 global_ndays_range = 20
 
 # --- Start --- Reading base data for the Sunburst
-industry_sentiment = pd.read_json('covidsm_agg_sentiment_industry.json.zip', orient='records')
+industry_sentiment = pd.read_json('covidsm_agg_sentiment2_industry.json.zip', orient='records')
 industry_sentiment['published_at_date'] = pd.to_datetime(industry_sentiment['published_at_date'], unit='ms')
 global_start_day = industry_sentiment['published_at_date'].max() - pd.DateOffset(days=global_ndays_range)
 industries_hrchy = pd.read_csv('industries-hrchy.csv')
